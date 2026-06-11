@@ -35,7 +35,7 @@ const currencyByIso2: Record<string, string> = {
   AU: "AUD", GB: "GBP", US: "USD", CA: "CAD", NZ: "NZD",
   DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", IE: "EUR",
   NL: "EUR", AT: "EUR", BE: "EUR", PT: "EUR", FI: "EUR",
-  IN: "INR", AE: "AED", BH: "BHD", SG: "SGD", JP: "JPY",
+  IN: "INR", AE: "AED", BH: "BHD", BB: "BBD", HK: "HKD", KR: "KRW", VN: "VND", EG: "EGP", NG: "NGN", KE: "KES", GH: "GHS", TR: "TRY", CL: "CLP", CO: "COP", PE: "PEN", CZ: "CZK", HU: "HUF", RO: "RON", SG: "SGD", JP: "JPY",
   CN: "CNY", ZA: "ZAR", BR: "BRL", MX: "MXN", CH: "CHF",
   SE: "SEK", NO: "NOK", DK: "DKK", PL: "PLN", MY: "MYR",
   TH: "THB", ID: "IDR", PH: "PHP", PK: "PKR", BD: "BDT",
@@ -84,6 +84,7 @@ export default function Home() {
   const [salary, setSalary] = useState("");
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [occupations, setOccupations] = useState<Occupation[]>([]);
+  const [occupationStatus, setOccupationStatus] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loadingCountries, setLoadingCountries] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
@@ -132,9 +133,28 @@ export default function Home() {
   }
 
   async function fetchOccupations(jobTitle: string) {
-    const res = await fetch(`/api/occupations?q=${encodeURIComponent(jobTitle)}`);
-    const data = await res.json();
-    return data.occupations || [];
+    try {
+      const res = await fetch(`/api/occupations?q=${encodeURIComponent(jobTitle)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        setOccupationStatus(data.error);
+        return [];
+      }
+
+      const matches = data.occupations || [];
+
+      if (matches.length === 0) {
+        setOccupationStatus("No ESCO occupation matches were found for this job title.");
+      } else {
+        setOccupationStatus(`Found ${matches.length} ESCO occupation match${matches.length === 1 ? "" : "es"}.`);
+      }
+
+      return matches;
+    } catch {
+      setOccupationStatus("Could not fetch ESCO occupation matches.");
+      return [];
+    }
   }
 
   async function runSimulation() {
@@ -146,6 +166,7 @@ export default function Home() {
     setLoadingData(true);
     setMetrics([]);
     setOccupations([]);
+    setOccupationStatus("");
     setScore(null);
     setError("");
 
@@ -214,7 +235,7 @@ export default function Home() {
         <h1 className="mb-3 text-4xl font-bold">Global Future Impact Simulator</h1>
 
         <p className="mb-8 text-gray-600">
-          Compare countries using live World Bank indicators and ESCO occupation matching.
+          Compare countries using live World Bank indicators and ESCO occupation classification.
         </p>
 
         {error && (
@@ -225,6 +246,7 @@ export default function Home() {
 
         <div className="grid gap-4">
           <select
+            suppressHydrationWarning
             className="w-full rounded-lg border p-3"
             value={selectedCode}
             onChange={(e) => setSelectedCode(e.target.value)}
@@ -242,6 +264,7 @@ export default function Home() {
           </select>
 
           <input
+            suppressHydrationWarning
             className="w-full rounded-lg border p-3"
             placeholder="Enter job title, e.g. OT Engineer, Nurse, Accountant"
             value={career}
@@ -249,6 +272,7 @@ export default function Home() {
           />
 
           <input
+            suppressHydrationWarning
             className="w-full rounded-lg border p-3"
             placeholder="Current annual salary, e.g. 110000"
             value={salary}
@@ -256,6 +280,7 @@ export default function Home() {
           />
 
           <button
+            suppressHydrationWarning
             onClick={runSimulation}
             className="rounded-lg bg-black px-6 py-3 font-semibold text-white"
           >
@@ -267,25 +292,33 @@ export default function Home() {
           <div className="mt-8 rounded-xl border bg-blue-50 p-6">
             <h2 className="text-2xl font-bold">Country Opportunity Score: {score}/100</h2>
             <p className="mt-2 text-gray-700">
-              This score uses GDP per capita, unemployment, inflation, and internet usage from the World Bank.
+              This score uses GDP per capita, unemployment, inflation, and internet usage from the World Bank. It does not use live job vacancy data.
             </p>
           </div>
         )}
 
-        {occupations.length > 0 && (
+        {(occupationStatus || occupations.length > 0) && (
           <div className="mt-8">
-            <h2 className="mb-4 text-2xl font-bold">Occupation Matches from ESCO</h2>
+            <h2 className="mb-4 text-2xl font-bold">Closest Occupation Matches from ESCO</h2>
 
-            <div className="space-y-4">
-              {occupations.map((occupation, index) => (
-                <div key={index} className="rounded-xl border bg-gray-50 p-5">
-                  <h3 className="text-xl font-semibold">{occupation.title}</h3>
-                  {occupation.description && (
-                    <p className="mt-2 text-gray-700">{occupation.description}</p>
-                  )}
-                </div>
-              ))}
-            </div>
+            {occupationStatus && (
+              <div className="mb-4 rounded-xl border bg-blue-50 p-5">
+                <p>{occupationStatus}</p>
+              </div>
+            )}
+
+            {occupations.length > 0 && (
+              <div className="space-y-4">
+                {occupations.map((occupation, index) => (
+                  <div key={index} className="rounded-xl border bg-gray-50 p-5">
+                    <h3 className="text-xl font-semibold">{occupation.title}</h3>
+                    {occupation.description && (
+                      <p className="mt-2 text-gray-700">{occupation.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -306,7 +339,7 @@ export default function Home() {
 
         <div className="mt-8 rounded-xl border bg-gray-50 p-5 text-sm text-gray-600">
           <p>
-            Data note: Country indicators are fetched live from the World Bank API using the latest available published values. Occupation matches are fetched from the European Commission ESCO API. ESCO provides occupation classification data, not live job vacancies or salaries.
+            Data note: Country indicators are fetched live from the World Bank API using the latest available published values. Closest occupation matches are fetched from the European Commission ESCO API. ESCO provides occupation classification data, not live job vacancies, job demand, or salary data.
           </p>
           <p className="mt-3">
             AI note: This platform was built with AI-assisted software development. The opportunity score and salary projections are generated by the app&apos;s calculation logic and should be treated as decision-support estimates, not financial, immigration, or career advice.
